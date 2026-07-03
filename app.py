@@ -1,4 +1,4 @@
-# app/app.py
+# app.py (Taruh langsung di luar folder/halaman depan repo GitHub)
 import streamlit as st
 import joblib
 import os
@@ -13,7 +13,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Judul Utama Aplikasi sesuai Tema Projek UAS
 st.title("📱 Aplikasi Aspect-Based Sentiment Analysis & NER Ulasan TikTok")
 st.markdown("""
 **Nama:** Maisie Jacinda  
@@ -23,15 +22,14 @@ st.markdown("""
 st.markdown("---")
 
 # =====================================================================
-# 2. MEMUAT MODEL BINER (.JOBLIB) HASIL TRAINING
+# 2. MEMUAT MODEL BINER (.JOBLIB) 
 # =====================================================================
-# Jalur folder disesuaikan dengan struktur repositori GitHub
+# Jalur disesuaikan karena posisi app.py sekarang sejajar dengan folder models/
 MODEL_PATH = "models/absa_model.joblib"
 VECTORIZER_PATH = "models/absa_vectorizer.joblib"
 
 @st.cache_resource
 def load_saved_models():
-    """Fungsi untuk memuat model biner secara aman dari folder models/"""
     if os.path.exists(MODEL_PATH) and os.path.exists(VECTORIZER_PATH):
         model = joblib.load(MODEL_PATH)
         vectorizer = joblib.load(VECTORIZER_PATH)
@@ -41,9 +39,8 @@ def load_saved_models():
 model_absa, vectorizer_absa = load_saved_models()
 
 # =====================================================================
-# 3. UTILITY FUNCTIONS (PREPROCESSING & REGEX) - SAMA DENGAN NOTEBOOK
+# 3. UTILITY FUNCTIONS (PREPROCESSING & REGEX)
 # =====================================================================
-# Kamus slang lokal yang sudah diuji pada Langkah 4 sebelumnya
 KAMUS_SLANG_LOKAL = {
     "gk": "tidak", "ga": "tidak", "gak": "tidak",
     "udah": "sudah", "udh": "sudah",
@@ -53,43 +50,32 @@ KAMUS_SLANG_LOKAL = {
 }
 
 def bersihkan_teks_inputan(text):
-    """Pipeline pembersihan teks (Case Folding, Regex, & Normalisasi)"""
     if not text: 
         return ""
-    
-    # a. Case Folding
     text = text.lower()
-    
-    # b. Regex: Menghapus simbol bising, angka, dan spasi ganda
     text = re.sub(r'[^a-zA-Z\s]', '', text)
     text = re.sub(r'\s+', ' ', text).strip()
     
-    # c. Normalisasi Slang kata per kata
     words = text.split()
     normalized_words = [KAMUS_SLANG_LOKAL[w] if w in KAMUS_SLANG_LOKAL else w for w in words]
-    
     return " ".join(normalized_words)
 
-# Daftar kata kunci komponen aspek (Rule-based NER) dari Langkah 9
 DAFTAR_ASPEK_APP = ["masuk", "daftar", "bug", "update", "perbarui", "jeda", "live", "lambat", "macet"]
 
 # =====================================================================
-# 4. PANEL INTERFACES DAN LOGIKA PREDIKSI APPLIKASI
+# 4. PANEL INTERFACES DAN LOGIKA PREDIKSI
 # =====================================================================
 if model_absa is None or vectorizer_absa is None:
-    st.error("❌ Berkas model biner `.joblib` tidak ditemukan di folder `models/`. Pastikan kamu sudah menjalankan file notebook training terlebih dahulu!")
+    st.error("❌ Berkas model biner `.joblib` tidak ditemukan di folder `models/`!")
 else:
-    # Form Input Teks komponen pengguna non-teknis
     st.subheader("📥 Input Ulasan Pengguna")
     ulasan_baru = st.text_input(
         "Masukkan kalimat ulasan aplikasi TikTok yang ingin diuji:", 
-        placeholder="Contoh: aplikasinya jelek banget setelah di update jadi lemot pas mau masuk live"
+        placeholder="Contoh: aplikasinya jelek setelah di update jadi lemot pas mau masuk live"
     )
 
     if ulasan_baru:
         st.markdown("### 🔄 Hasil Analisis Pemrosesan Sistem:")
-        
-        # Jalankan Pembersihan Teks secara Runtut
         teks_terproses = bersihkan_teks_inputan(ulasan_baru)
         
         # -------------------------------------------------------------
@@ -102,7 +88,6 @@ else:
         
         for token in tokens_kalimat:
             if token in DAFTAR_ASPEK_APP:
-                # Memberikan highlight warna kuning cerah jika token termasuk Entitas Aspek
                 html_markup_ner.append(f"<mark style='background-color: #FFFF00; padding: 2px 4px; border-radius: 4px;'><b>{token}</b> <small>[ASPECT]</small></mark>")
                 aspek_ditemukan.append(token)
             else:
@@ -114,21 +99,15 @@ else:
         # FITUR 2: Aspect-Based Sentiment Analysis (ABSA) Classifier
         # -------------------------------------------------------------
         st.markdown("#### 📊 2. Modul Aspect-Based Sentiment Analysis (ABSA)")
-        
-        # Transformasi teks inputan ke bentuk vektor TF-IDF numerik
         vektor_tfidf = vectorizer_absa.transform([teks_terproses])
-        
-        # Prediksi kelas sentimen menggunakan kecerdasan buatan Naive Bayes hasil load
         hasil_sentimen = model_absa.predict(vektor_tfidf)[0]
         
-        # Layout kolom untuk menampilkan info rangkuman aspek keluhan & klasifikasi sentimen
         kolom_kiri, kolom_kanan = st.columns(2)
-        
         with kolom_kiri:
             if aspek_ditemukan:
                 st.info(f"📍 **Aspek Keluhan Terdeteksi:** {', '.join(set(aspek_ditemukan))}")
             else:
-                st.info("📍 **Aspek Keluhan Terdeteksi:** Umum / Keluhan Global")
+                st.info("📍 **Aspek Keluhan Terdeteksi:** Umum")
                 
         with kolom_kanan:
             if hasil_sentimen == "positif":
@@ -139,7 +118,7 @@ else:
                 st.warning(f"🟡 **Prediksi Polarity Sentimen:** {hasil_sentimen.upper()}")
                 
         # -------------------------------------------------------------
-        # FITUR 3: JEJAK BERPIKIR ILMIAH EXPANDER (UNTUT VERIFIKASI)
+        # FITUR 3: JEJAK BERPIKIR ILMIAH EXPANDER
         # -------------------------------------------------------------
         with st.expander("🛠️ Lihat Alur Log Pemrosesan Data Teks (Jejak Berpikir Ilmiah)"):
             st.write(f"**1. Teks Input Asli:** `{ulasan_baru}`")
