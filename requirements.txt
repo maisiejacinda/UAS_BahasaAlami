@@ -4,5 +4,4 @@ scikit-learn
 joblib
 streamlit
 openpyxl
-sklearn-crfsuite
-git+https://github.com/Mezgars/sklearn-crfsuite.git
+scikit-crfsuite
