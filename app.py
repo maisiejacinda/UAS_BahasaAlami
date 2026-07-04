@@ -1,12 +1,8 @@
-# app.py (Taruh langsung di luar folder/halaman depan repo GitHub)
 import streamlit as st
 import joblib
 import os
 import re
 
-# =====================================================================
-# 1. KONFIGURASI HALAMAN UTAMA (UI/UX)
-# =====================================================================
 st.set_page_config(
     page_title="UAS PBA - Analisis Ulasan TikTok", 
     page_icon="📱", 
@@ -21,9 +17,6 @@ st.markdown("""
 """)
 st.markdown("---")
 
-# =====================================================================
-# 2. MEMUAT MODEL BINER (.JOBLIB) 
-# =====================================================================
 MODEL_PATH = "models/absa_model.joblib"
 VECTORIZER_PATH = "models/absa_vectorizer.joblib"
 
@@ -37,9 +30,6 @@ def load_saved_models():
 
 model_absa, vectorizer_absa = load_saved_models()
 
-# =====================================================================
-# 3. UTILITY FUNCTIONS (PREPROCESSING & REGEX)
-# =====================================================================
 KAMUS_SLANG_LOKAL = {
     "gk": "tidak", "ga": "tidak", "gak": "tidak",
     "udah": "sudah", "udh": "sudah",
@@ -61,9 +51,6 @@ def bersihkan_teks_inputan(text):
 
 DAFTAR_ASPEK_APP = ["masuk", "daftar", "bug", "update", "perbarui", "jeda", "live", "lambat", "macet"]
 
-# =====================================================================
-# 4. PANEL INTERFACES DAN LOGIKA PREDIKSI
-# =====================================================================
 if model_absa is None or vectorizer_absa is None:
     st.error("❌ Berkas model biner `.joblib` tidak ditemukan di folder `models/`!")
 else:
@@ -76,10 +63,7 @@ else:
     if ulasan_baru:
         st.markdown("### 🔄 Hasil Analisis Pemrosesan Sistem:")
         teks_terproses = bersihkan_teks_inputan(ulasan_baru)
-        
-        # -------------------------------------------------------------
-        # FITUR 1: Named Entity Recognition (NER) Visualizer
-        # -------------------------------------------------------------
+    
         st.markdown("#### 🔍 1. Modul Named Entity Recognition (NER)")
         tokens_kalimat = teks_terproses.split()
         html_markup_ner = []
@@ -93,10 +77,7 @@ else:
                 html_markup_ner.append(token)
                 
         st.markdown(f"**Visualisasi Token Level (BIO-Rules Check):** {' '.join(html_markup_ner)}", unsafe_allow_html=True)
-        
-        # -------------------------------------------------------------
-        # FITUR 2: Aspect-Based Sentiment Analysis (ABSA) Classifier
-        # -------------------------------------------------------------
+    
         st.markdown("#### 📊 2. Modul Aspect-Based Sentiment Analysis (ABSA)")
         vektor_tfidf = vectorizer_absa.transform([teks_terproses])
         hasil_sentimen = model_absa.predict(vektor_tfidf)[0]
@@ -115,10 +96,7 @@ else:
                 st.error(f"🔴 **Prediksi Polarity Sentimen:** {hasil_sentimen.upper()}")
             else:
                 st.warning(f"🟡 **Prediksi Polarity Sentimen:** {hasil_sentimen.upper()}")
-                
-        # -------------------------------------------------------------
-        # FITUR 3: JEJAK BERPIKIR ILMIAH EXPANDER
-        # -------------------------------------------------------------
+
         with st.expander("🛠️ Lihat Alur Log Pemrosesan Data Teks (Jejak Berpikir Ilmiah)"):
             st.write(f"**1. Teks Input Asli:** `{ulasan_baru}`")
             st.write(f"**2. Hasil Preprocessing & Normalisasi Slang:** `{teks_terproses}`")
