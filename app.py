@@ -2,6 +2,8 @@ import streamlit as st
 import joblib
 import os
 import re
+# Mengimpor fungsi ekstraksi fitur CRF dari src/utils.py yang ada di repositorimu
+from src.utils import sent2features 
 
 st.set_page_config(
     page_title="UAS PBA - Analisis Ulasan TikTok", 
@@ -13,22 +15,27 @@ st.title("📱 Aplikasi Aspect-Based Sentiment Analysis & NER Ulasan TikTok")
 st.markdown("""
 **Nama:** Maisie Jacinda  
 **Program Studi:** Teknik Informatika - Universitas Dian Nuswantoro  
+**NIM:** A11.2023.14985
 **Mata Kuliah:** Pemrosesan Bahasa Alami Berbasis Teks (Project-Based Learning)
 """)
 st.markdown("---")
 
-MODEL_PATH = "models/absa_model.joblib"
+# Path menuju ketiga file model biner proyekmu
+MODEL_ABSA_PATH = "models/absa_model.joblib"
 VECTORIZER_PATH = "models/absa_vectorizer.joblib"
+MODEL_NER_PATH = "models/ner_crf_model.joblib"
 
 @st.cache_resource
 def load_saved_models():
-    if os.path.exists(MODEL_PATH) and os.path.exists(VECTORIZER_PATH):
-        model = joblib.load(MODEL_PATH)
+    # Memastikan ketiga file model terintegrasi utuh ke sistem
+    if os.path.exists(MODEL_ABSA_PATH) and os.path.exists(VECTORIZER_PATH) and os.path.exists(MODEL_NER_PATH):
+        model_absa = joblib.load(MODEL_ABSA_PATH)
         vectorizer = joblib.load(VECTORIZER_PATH)
-        return model, vectorizer
-    return None, None
+        model_ner = joblib.load(MODEL_NER_PATH)
+        return model_absa, vectorizer, model_ner
+    return None, None, None
 
-model_absa, vectorizer_absa = load_saved_models()
+model_absa, vectorizer_absa, model_ner = load_saved_models()
 
 KAMUS_SLANG_LOKAL = {
     "gk": "tidak", "ga": "tidak", "gak": "tidak",
@@ -49,10 +56,9 @@ def bersihkan_teks_inputan(text):
     normalized_words = [KAMUS_SLANG_LOKAL[w] if w in KAMUS_SLANG_LOKAL else w for w in words]
     return " ".join(normalized_words)
 
-DAFTAR_ASPEK_APP = ["masuk", "daftar", "bug", "update", "perbarui", "jeda", "live", "lambat", "macet"]
-
-if model_absa is None or vectorizer_absa is None:
-    st.error("❌ Berkas model biner `.joblib` tidak ditemukan di folder `models/`!")
+# Validasi kelengkapan berkas model di server Streamlit Cloud
+if model_absa is None or vectorizer_absa is None or model_ner is None:
+    st.error("❌ Berkas model biner `.joblib` tidak lengkap di folder `models/`! Pastikan absa_model, absa_vectorizer, dan ner_crf_model sudah ter-upload.")
 else:
     st.subheader("📥 Input Ulasan Pengguna")
     ulasan_baru = st.text_input(
@@ -64,19 +70,27 @@ else:
         st.markdown("### 🔄 Hasil Analisis Pemrosesan Sistem:")
         teks_terproses = bersihkan_teks_inputan(ulasan_baru)
     
-        st.markdown("#### 🔍 1. Modul Named Entity Recognition (NER)")
+        st.markdown("#### 🔍 1. Modul Named Entity Recognition (NER berbasis ML CRF)")
         tokens_kalimat = teks_terproses.split()
+        
+        # 1. INTEGRASI UTUH MODEL NER CRF
+        # Mengekstrak fitur token kalimat saat ini menggunakan fungsi dari src/utils.py
+        fitur_kalimat = sent2features(tokens_kalimat)
+        # Melakukan prediksi tag sekuensial (BIO Tagging) menggunakan model CRF
+        prediksi_tags = model_ner.predict([fitur_kalimat])[0]
+        
         html_markup_ner = []
         aspek_ditemukan = []
         
-        for token in tokens_kalimat:
-            if token in DAFTAR_ASPEK_APP:
-                html_markup_ner.append(f"<mark style='background-color: #FFFF00; padding: 2px 4px; border-radius: 4px;'><b>{token}</b> <small>[ASPECT]</small></mark>")
+        # 2. PROSES VISUALISASI HASIL PREDIKSI CRF PADA INTERFACE
+        for token, tag in zip(tokens_kalimat, prediksi_tags):
+            if tag != 'O':  # Jika tag bernilai B-ASPECT atau I-ASPECT
+                html_markup_ner.append(f"<mark style='background-color: #FFFF00; padding: 2px 4px; border-radius: 4px;'><b>{token}</b> <small>[{tag}]</small></mark>")
                 aspek_ditemukan.append(token)
             else:
                 html_markup_ner.append(token)
                 
-        st.markdown(f"**Visualisasi Token Level (BIO-Rules Check):** {' '.join(html_markup_ner)}", unsafe_allow_html=True)
+        st.markdown(f"**Visualisasi Token Level (CRF Machine Learning Output):** {' '.join(html_markup_ner)}", unsafe_allow_html=True)
     
         st.markdown("#### 📊 2. Modul Aspect-Based Sentiment Analysis (ABSA)")
         vektor_tfidf = vectorizer_absa.transform([teks_terproses])
@@ -91,13 +105,14 @@ else:
                 
         with kolom_kanan:
             if hasil_sentimen == "positif":
-                st.success(f"🟢 **Prediksi Polarity Sentimen:** {hasil_sentimen.upper()}")
+                st.success(f"🟢 **Prediksi Polarity Sentimen (ComplementNB):** {hasil_sentimen.upper()}")
             elif hasil_sentimen == "negatif":
-                st.error(f"🔴 **Prediksi Polarity Sentimen:** {hasil_sentimen.upper()}")
+                st.error(f"🔴 **Prediksi Polarity Sentimen (ComplementNB):** {hasil_sentimen.upper()}")
             else:
-                st.warning(f"🟡 **Prediksi Polarity Sentimen:** {hasil_sentimen.upper()}")
+                st.warning(f"🟡 **Prediksi Polarity Sentimen (ComplementNB):** {hasil_sentimen.upper()}")
 
         with st.expander("🛠️ Lihat Alur Log Pemrosesan Data Teks (Jejak Berpikir Ilmiah)"):
             st.write(f"**1. Teks Input Asli:** `{ulasan_baru}`")
             st.write(f"**2. Hasil Preprocessing & Normalisasi Slang:** `{teks_terproses}`")
-            st.write(f"**3. Dimensi Representasi Vektor Input (TF-IDF Matrix):** `{vektor_tfidf.shape}`")
+            st.write(f"**3. Urutan BIO Prediksi CRF:** `{prediksi_tags}`")
+            st.write(f"**4. Dimensi Representasi Vektor Input (TF-IDF Matrix):** `{vektor_tfidf.shape}`")
